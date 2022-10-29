@@ -10,6 +10,17 @@ class ItemRepository<T extends Object> {
   /// The current map can be fetched using `Map<String, T> get itemMap`
   Map<String, T> _itemMap = <String, T>{};
 
+  /// Nullable function.
+  ///
+  /// Used in `Future<T> fetchItem(String key)` or
+  /// `Future<T?> fetchNullableItem(String key)`
+  /// to download the item if not currently present.
+  final Future<T?> Function(String key)? fetchItemFunction;
+
+  ItemRepository({
+    this.fetchItemFunction,
+  });
+
   /// Returns the current `Map<String, T>`
   ///
   /// The current map can be set using `set setMap(Map<String, T> map)`
@@ -31,10 +42,66 @@ class ItemRepository<T extends Object> {
     return _item;
   }
 
+  /// Returns the `Future<T> item`.
+  ///
+  /// If no item has been stored under the provided key,
+  /// the item will be fetched using `Future<T?> Function(String key)? fetchItemFunction`.
+  ///
+  /// If `Future<T?> Function(String key)? fetchItemFunction` was not set
+  /// when initializing the repository a `ItemRepositoryException` is thrown.
+  ///
+  /// If no item was found and fetching the item returned a null value,
+  /// a `ItemRepositoryException` is thrown.
+  Future<T> fetchItem(String key) async {
+    assert(fetchItemFunction != null, fetchFunctionNotSet);
+    try {
+      T? item = getNullableItem(key);
+
+      if (item == null) {
+        item = await fetchItemFunction!(key);
+
+        if (item == null) throw itemNotFound;
+
+        putItem(key: key, item: item);
+      }
+
+      return item;
+    } catch (e) {
+      if (e is ItemRepositoryException) rethrow;
+      throw fetchFunctionError;
+    }
+  }
+
   /// Returns the `T? item`.
   ///
   /// If no item has been stored under the provided key, a null value is returned.
   T? getNullableItem(String key) => _itemMap[key];
+
+  /// Returns the `Future<T> item`.
+  ///
+  /// If no item has been stored under the provided key,
+  /// the item will be fetched using `Future<T?> Function(String key)? fetchItemFunction`.
+  ///
+  /// If `Future<T?> Function(String key)? fetchItemFunction` was not set
+  /// when initializing the repository a `ItemRepositoryException` is thrown.
+  Future<T?> fetchNullableItem(String key) async {
+    assert(fetchItemFunction != null, fetchFunctionNotSet);
+    try {
+      T? item = getNullableItem(key);
+
+      if (item == null) {
+        item = await fetchItemFunction!(key);
+
+        if (item != null) {
+          putItem(key: key, item: item);
+        }
+      }
+
+      return item;
+    } catch (_) {
+      throw fetchFunctionError;
+    }
+  }
 
   /// Sets or updates an item
   ///
